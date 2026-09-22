@@ -1,0 +1,19 @@
+{
+  "publisherId": "gitguardian",
+  "offerId": "azure-sentinel-solution-gitguardian",
+  "firstPublishDate": "2026-09-22",
+  "providers": [
+    "GitGuardian"
+  ],
+  "categories": {
+    "domains": [
+      "Security - Others"
+    ]
+  },
+  "support": {
+    "name": "GitGuardian",
+    "email": "support@gitguardian.com",
+    "tier": "Partner",
+    "link": "https://www.gitguardian.com/support"
+  }
+}

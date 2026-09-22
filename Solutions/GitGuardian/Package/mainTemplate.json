@@ -1,0 +1,1342 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "author": "GitGuardian - support@gitguardian.com",
+    "comments": "Solution template for GitGuardian"
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Not used, but needed to pass arm-ttk test `Location-Should-Not-Be-Hardcoded`.  We instead use the `workspace-location` which is derived from the LA workspace"
+      }
+    },
+    "workspace-location": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "[concat('Region to deploy solution resources -- separate from location selection',parameters('location'))]"
+      }
+    },
+    "workspace": {
+      "defaultValue": "",
+      "type": "string",
+      "metadata": {
+        "description": "Workspace name for Log Analytics where Microsoft Sentinel is setup"
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "resource group name where Microsoft Sentinel is setup"
+      }
+    },
+    "subscription": {
+      "type": "string",
+      "defaultValue": "[last(split(subscription().id, '/'))]",
+      "metadata": {
+        "description": "subscription id where Microsoft Sentinel is setup"
+      }
+    }
+  },
+  "variables": {
+    "email": "support@gitguardian.com",
+    "_email": "[variables('email')]",
+    "_solutionName": "GitGuardian",
+    "_solutionVersion": "4.0.0",
+    "solutionId": "gitguardian.azure-sentinel-solution-gitguardian",
+    "_solutionId": "[variables('solutionId')]",
+    "workspaceResourceId": "[resourceId('microsoft.OperationalInsights/Workspaces', parameters('workspace'))]",
+    "dataConnectorCCPVersion": "4.0.0",
+    "_dataConnectorContentIdConnectorDefinition1": "GitGuardianEnterpriseDataConnector",
+    "dataConnectorTemplateNameConnectorDefinition1": "[concat(parameters('workspace'),'-dc-',uniquestring(variables('_dataConnectorContentIdConnectorDefinition1')))]",
+    "_dataConnectorContentIdConnections1": "GitGuardianEnterpriseDataConnectorConnections",
+    "dataConnectorTemplateNameConnections1": "[concat(parameters('workspace'),'-dc-',uniquestring(variables('_dataConnectorContentIdConnections1')))]",
+    "dataCollectionEndpointId1": "[concat('/subscriptions/',parameters('subscription'),'/resourceGroups/',parameters('resourceGroupName'),'/providers/Microsoft.Insights/dataCollectionEndpoints/',parameters('workspace'))]",
+    "blanks": "[replace('b', 'b', '')]",
+    "_solutioncontentProductId": "[concat(take(variables('_solutionId'),50),'-','sl','-', uniqueString(concat(variables('_solutionId'),'-','Solution','-',variables('_solutionId'),'-', variables('_solutionVersion'))))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/contentTemplates",
+      "apiVersion": "2023-04-01-preview",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', variables('dataConnectorTemplateNameConnectorDefinition1'), variables('dataConnectorCCPVersion'))]",
+      "location": "[parameters('workspace-location')]",
+      "dependsOn": [
+        "[extensionResourceId(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), 'Microsoft.SecurityInsights/contentPackages', variables('_solutionId'))]"
+      ],
+      "properties": {
+        "contentId": "[variables('_dataConnectorContentIdConnectorDefinition1')]",
+        "displayName": "GitGuardian Enterprise (via Codeless Connector Framework)",
+        "contentKind": "DataConnector",
+        "mainTemplate": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "[variables('dataConnectorCCPVersion')]",
+          "parameters": {},
+          "variables": {},
+          "resources": [
+            {
+              "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',variables('_dataConnectorContentIdConnectorDefinition1'))]",
+              "apiVersion": "2022-09-01-preview",
+              "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+              "location": "[parameters('workspace-location')]",
+              "kind": "Customizable",
+              "properties": {
+                "connectorUiConfig": {
+                  "id": "GitGuardianEnterpriseDataConnector",
+                  "title": "GitGuardian Enterprise (via Codeless Connector Framework)",
+                  "publisher": "GitGuardian",
+                  "descriptionMarkdown": "The GitGuardian Enterprise data connector ingests secret incidents and workspace audit logs into Microsoft Sentinel by using the GitGuardian API. Secret incidents provide visibility into exposed secrets and their remediation lifecycle. Audit logs record administrative and user activity in the GitGuardian workspace.\n\nThis connector supports the GitGuardian SaaS US and EU regions.",
+                  "graphQueriesTableName": "GitGuardianSecretIncidents_CL",
+                  "graphQueries": [
+                    {
+                      "metricName": "GitGuardian secret incidents",
+                      "legend": "Secret incidents",
+                      "baseQuery": "GitGuardianSecretIncidents_CL"
+                    },
+                    {
+                      "metricName": "GitGuardian audit logs",
+                      "legend": "Audit logs",
+                      "baseQuery": "GitGuardianAuditLogs_CL"
+                    }
+                  ],
+                  "sampleQueries": [
+                    {
+                      "description": "Recent GitGuardian secret incidents",
+                      "query": "GitGuardianSecretIncidents_CL\n| sort by TimeGenerated desc\n| take 10"
+                    },
+                    {
+                      "description": "Open secret incidents by severity",
+                      "query": "GitGuardianSecretIncidents_CL\n| where Status == \"TRIGGERED\"\n| summarize IncidentCount = count() by Severity\n| sort by IncidentCount desc"
+                    },
+                    {
+                      "description": "Recent GitGuardian workspace audit activity",
+                      "query": "GitGuardianAuditLogs_CL\n| sort by TimeGenerated desc\n| take 10"
+                    },
+                    {
+                      "description": "GitGuardian audit activity by event",
+                      "query": "GitGuardianAuditLogs_CL\n| summarize EventCount = count() by EventName, ActionType\n| sort by EventCount desc"
+                    }
+                  ],
+                  "dataTypes": [
+                    {
+                      "name": "GitGuardianSecretIncidents_CL",
+                      "lastDataReceivedQuery": "GitGuardianSecretIncidents_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+                    },
+                    {
+                      "name": "GitGuardianAuditLogs_CL",
+                      "lastDataReceivedQuery": "GitGuardianAuditLogs_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+                    }
+                  ],
+                  "connectivityCriteria": [
+                    {
+                      "type": "HasDataConnectors"
+                    },
+                    {
+                      "type": "IsConnectedQuery",
+                      "value": [
+                        "union GitGuardianSecretIncidents_CL, GitGuardianAuditLogs_CL | where TimeGenerated > ago(1h) | take 1"
+                      ]
+                    }
+                  ],
+                  "availability": {
+                    "isPreview": true,
+                    "status": 1
+                  },
+                  "permissions": {
+                    "resourceProvider": [
+                      {
+                        "provider": "Microsoft.OperationalInsights/workspaces",
+                        "permissionsDisplayText": "Read and write permissions are required.",
+                        "providerDisplayName": "Workspace",
+                        "scope": "Workspace",
+                        "requiredPermissions": {
+                          "write": true,
+                          "read": true,
+                          "delete": true,
+                          "action": false
+                        }
+                      }
+                    ],
+                    "customs": [
+                      {
+                        "name": "GitGuardian Enterprise workspace",
+                        "description": "An active GitGuardian Enterprise workspace in the US or EU SaaS region is required."
+                      },
+                      {
+                        "name": "GitGuardian API token",
+                        "description": "A GitGuardian service account token with the `incidents:read` and `audit_logs:read` scopes is required."
+                      }
+                    ]
+                  },
+                  "instructionSteps": [
+                    {
+                      "title": "Create a GitGuardian service account token",
+                      "description": "1. In GitGuardian, create a service account for Microsoft Sentinel.\n2. Grant the service account the `incidents:read` and `audit_logs:read` scopes.\n3. Create and securely copy its API token.\n\nFor more information, see the [GitGuardian API authentication documentation](https://docs.gitguardian.com/api-docs/authentication)."
+                    },
+                    {
+                      "title": "Connect GitGuardian Enterprise",
+                      "description": "Select the GitGuardian SaaS region and enter the service account token.",
+                      "instructions": [
+                        {
+                          "type": "ContextPane",
+                          "parameters": {
+                            "label": "Add Connection",
+                            "title": "Add GitGuardian Enterprise connection",
+                            "subtitle": "Collect secret incidents and workspace audit logs",
+                            "contextPaneType": "DataConnectorsContextPane",
+                            "instructionSteps": [
+                              {
+                                "instructions": [
+                                  {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                      "label": "Connection name",
+                                      "placeholder": "e.g. Contoso GitGuardian",
+                                      "type": "text",
+                                      "name": "friendlyName",
+                                      "validations": {
+                                        "required": true
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "Dropdown",
+                                    "parameters": {
+                                      "label": "GitGuardian SaaS region",
+                                      "name": "BaseUrl",
+                                      "options": [
+                                        {
+                                          "key": "https://api.gitguardian.com",
+                                          "text": "United States"
+                                        },
+                                        {
+                                          "key": "https://api.eu1.gitguardian.com",
+                                          "text": "Europe"
+                                        }
+                                      ],
+                                      "isMultiSelect": false,
+                                      "required": true
+                                    }
+                                  },
+                                  {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                      "label": "API token",
+                                      "placeholder": "Enter the GitGuardian service account token",
+                                      "type": "password",
+                                      "name": "ApiToken",
+                                      "validations": {
+                                        "required": true
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "DataConnectorsGrid",
+                          "parameters": {
+                            "mapping": [
+                              {
+                                "columnName": "Connection",
+                                "columnValue": "properties.addOnAttributes.friendlyName"
+                              },
+                              {
+                                "columnName": "Data stream",
+                                "columnValue": "properties.dataType"
+                              },
+                              {
+                                "columnName": "API URL",
+                                "columnValue": "properties.request.apiEndpoint"
+                              }
+                            ],
+                            "menuItems": [
+                              "DeleteConnector"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',concat('DataConnector-', variables('_dataConnectorContentIdConnectorDefinition1')))]",
+              "apiVersion": "2022-01-01-preview",
+              "type": "Microsoft.OperationalInsights/workspaces/providers/metadata",
+              "properties": {
+                "parentId": "[extensionResourceId(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), 'Microsoft.SecurityInsights/dataConnectorDefinitions', variables('_dataConnectorContentIdConnectorDefinition1'))]",
+                "contentId": "[variables('_dataConnectorContentIdConnectorDefinition1')]",
+                "kind": "DataConnector",
+                "version": "[variables('dataConnectorCCPVersion')]",
+                "source": {
+                  "sourceId": "[variables('_solutionId')]",
+                  "name": "[variables('_solutionName')]",
+                  "kind": "Solution"
+                },
+                "author": {
+                  "name": "GitGuardian",
+                  "email": "[variables('_email')]"
+                },
+                "support": {
+                  "name": "GitGuardian",
+                  "email": "support@gitguardian.com",
+                  "tier": "Partner",
+                  "link": "https://www.gitguardian.com/support"
+                },
+                "dependencies": {
+                  "criteria": [
+                    {
+                      "version": "[variables('dataConnectorCCPVersion')]",
+                      "contentId": "[variables('_dataConnectorContentIdConnections1')]",
+                      "kind": "ResourcesDataConnector"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GitGuardianEnterpriseDCR",
+              "apiVersion": "2022-06-01",
+              "type": "Microsoft.Insights/dataCollectionRules",
+              "location": "[parameters('workspace-location')]",
+              "kind": "[variables('blanks')]",
+              "properties": {
+                "dataCollectionEndpointId": "[variables('dataCollectionEndpointId1')]",
+                "streamDeclarations": {
+                  "Custom-GitGuardianSecretIncidents_CL": {
+                    "columns": [
+                      {
+                        "name": "id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "date",
+                        "type": "string"
+                      },
+                      {
+                        "name": "detector",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "secret_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "secret_hash",
+                        "type": "string"
+                      },
+                      {
+                        "name": "hmsl_hash",
+                        "type": "string"
+                      },
+                      {
+                        "name": "gitguardian_url",
+                        "type": "string"
+                      },
+                      {
+                        "name": "regression",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "status",
+                        "type": "string"
+                      },
+                      {
+                        "name": "assignee_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "assignee_email",
+                        "type": "string"
+                      },
+                      {
+                        "name": "occurrences_count",
+                        "type": "long"
+                      },
+                      {
+                        "name": "secret_presence",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "ignore_reason",
+                        "type": "string"
+                      },
+                      {
+                        "name": "triggered_at",
+                        "type": "string"
+                      },
+                      {
+                        "name": "ignored_at",
+                        "type": "string"
+                      },
+                      {
+                        "name": "ignorer_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "ignorer_api_token_id",
+                        "type": "string"
+                      },
+                      {
+                        "name": "resolver_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "resolver_api_token_id",
+                        "type": "string"
+                      },
+                      {
+                        "name": "secret_revoked",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "severity",
+                        "type": "string"
+                      },
+                      {
+                        "name": "validity",
+                        "type": "string"
+                      },
+                      {
+                        "name": "resolved_at",
+                        "type": "string"
+                      },
+                      {
+                        "name": "share_url",
+                        "type": "string"
+                      },
+                      {
+                        "name": "tags",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "custom_tags",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "feedback_list",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "incident_name",
+                        "type": "string"
+                      },
+                      {
+                        "name": "risk_score",
+                        "type": "long"
+                      },
+                      {
+                        "name": "severity_rule_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "is_vaulted",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "public_exposure",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "destination_tickets",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "occurrences",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "friendlyName",
+                        "type": "string"
+                      },
+                      {
+                        "name": "regionApiUrl",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "Custom-GitGuardianAuditLogs_CL": {
+                    "columns": [
+                      {
+                        "name": "id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "date",
+                        "type": "string"
+                      },
+                      {
+                        "name": "member_email",
+                        "type": "string"
+                      },
+                      {
+                        "name": "member_name",
+                        "type": "string"
+                      },
+                      {
+                        "name": "member_id",
+                        "type": "long"
+                      },
+                      {
+                        "name": "api_token_id",
+                        "type": "string"
+                      },
+                      {
+                        "name": "ip_address",
+                        "type": "string"
+                      },
+                      {
+                        "name": "target_ids",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "action_type",
+                        "type": "string"
+                      },
+                      {
+                        "name": "event_name",
+                        "type": "string"
+                      },
+                      {
+                        "name": "data",
+                        "type": "dynamic"
+                      },
+                      {
+                        "name": "friendlyName",
+                        "type": "string"
+                      },
+                      {
+                        "name": "regionApiUrl",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "destinations": {
+                  "logAnalytics": [
+                    {
+                      "workspaceResourceId": "[variables('workspaceResourceId')]",
+                      "name": "clv2ws1"
+                    }
+                  ]
+                },
+                "dataFlows": [
+                  {
+                    "streams": [
+                      "Custom-GitGuardianSecretIncidents_CL"
+                    ],
+                    "destinations": [
+                      "clv2ws1"
+                    ],
+                    "outputStream": "Custom-GitGuardianSecretIncidents_CL",
+                    "transformKql": "source\n| extend TimeGenerated = todatetime(date), IncidentId = id, LastTriggeredAt = todatetime(date), TriggeredAt = todatetime(triggered_at), IgnoredAt = todatetime(ignored_at), ResolvedAt = todatetime(resolved_at), Detector = todynamic(detector), SecretPresence = todynamic(secret_presence), Tags = todynamic(tags), CustomTags = todynamic(custom_tags), Feedback = todynamic(feedback_list), PublicExposure = todynamic(public_exposure), DestinationTickets = todynamic(destination_tickets), Occurrences = todynamic(occurrences), ConnectionName = friendlyName, RegionApiUrl = regionApiUrl\n| project TimeGenerated, IncidentId, IncidentName=incident_name, Status=status, Severity=severity, Validity=validity, RiskScore=risk_score, LastTriggeredAt, TriggeredAt, IgnoredAt, ResolvedAt, SecretId=secret_id, SecretHash=secret_hash, HasMySecretLeakedHash=hmsl_hash, GitGuardianUrl=gitguardian_url, IsRegression=regression, AssigneeId=assignee_id, AssigneeEmail=assignee_email, OccurrencesCount=occurrences_count, IgnoreReason=ignore_reason, IgnorerId=ignorer_id, IgnorerApiTokenId=ignorer_api_token_id, ResolverId=resolver_id, ResolverApiTokenId=resolver_api_token_id, IsSecretRevoked=secret_revoked, ShareUrl=share_url, SeverityRuleId=severity_rule_id, IsVaulted=is_vaulted, Detector, SecretPresence, Tags, CustomTags, Feedback, PublicExposure, DestinationTickets, Occurrences, ConnectionName, RegionApiUrl"
+                  },
+                  {
+                    "streams": [
+                      "Custom-GitGuardianAuditLogs_CL"
+                    ],
+                    "destinations": [
+                      "clv2ws1"
+                    ],
+                    "outputStream": "Custom-GitGuardianAuditLogs_CL",
+                    "transformKql": "source\n| extend TimeGenerated = todatetime(date), AuditLogId = id, EventTime = todatetime(date), TargetIds = todynamic(target_ids), EventData = todynamic(data), ConnectionName = friendlyName, RegionApiUrl = regionApiUrl\n| project TimeGenerated, AuditLogId, EventTime, EventName=event_name, ActionType=action_type, MemberId=member_id, MemberName=member_name, MemberEmail=member_email, ApiTokenId=api_token_id, IpAddress=ip_address, TargetIds, EventData, ConnectionName, RegionApiUrl"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "GitGuardianAuditLogs_CL",
+              "apiVersion": "2022-10-01",
+              "type": "Microsoft.OperationalInsights/workspaces/tables",
+              "location": "[parameters('workspace-location')]",
+              "kind": null,
+              "properties": {
+                "schema": {
+                  "name": "GitGuardianAuditLogs_CL",
+                  "description": "GitGuardian workspace administrative and user audit activity.",
+                  "columns": [
+                    {
+                      "name": "TimeGenerated",
+                      "type": "datetime",
+                      "description": "Time the audited event occurred."
+                    },
+                    {
+                      "name": "AuditLogId",
+                      "type": "long",
+                      "description": "Unique GitGuardian audit log identifier."
+                    },
+                    {
+                      "name": "EventTime",
+                      "type": "datetime",
+                      "description": "Time the audited event occurred."
+                    },
+                    {
+                      "name": "EventName",
+                      "type": "string",
+                      "description": "Name of the audited event."
+                    },
+                    {
+                      "name": "ActionType",
+                      "type": "string",
+                      "description": "Type of action performed."
+                    },
+                    {
+                      "name": "MemberId",
+                      "type": "long",
+                      "description": "Identifier of the member who performed the action."
+                    },
+                    {
+                      "name": "MemberName",
+                      "type": "string",
+                      "description": "Name of the member who performed the action."
+                    },
+                    {
+                      "name": "MemberEmail",
+                      "type": "string",
+                      "description": "Email of the member who performed the action."
+                    },
+                    {
+                      "name": "ApiTokenId",
+                      "type": "string",
+                      "description": "Identifier of the API token used for the action."
+                    },
+                    {
+                      "name": "IpAddress",
+                      "type": "string",
+                      "description": "Source IP address of the audited action."
+                    },
+                    {
+                      "name": "TargetIds",
+                      "type": "dynamic",
+                      "description": "Identifiers of resources targeted by the action."
+                    },
+                    {
+                      "name": "EventData",
+                      "type": "dynamic",
+                      "description": "Additional data associated with the audited event."
+                    },
+                    {
+                      "name": "ConnectionName",
+                      "type": "string",
+                      "description": "Friendly name of the connector instance."
+                    },
+                    {
+                      "name": "RegionApiUrl",
+                      "type": "string",
+                      "description": "GitGuardian SaaS API region used by the connector."
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GitGuardianSecretIncidents_CL",
+              "apiVersion": "2022-10-01",
+              "type": "Microsoft.OperationalInsights/workspaces/tables",
+              "location": "[parameters('workspace-location')]",
+              "kind": null,
+              "properties": {
+                "schema": {
+                  "name": "GitGuardianSecretIncidents_CL",
+                  "description": "GitGuardian secret incidents and remediation lifecycle data.",
+                  "columns": [
+                    {
+                      "name": "TimeGenerated",
+                      "type": "datetime",
+                      "description": "Time the incident was last triggered."
+                    },
+                    {
+                      "name": "IncidentId",
+                      "type": "long",
+                      "description": "Unique GitGuardian incident identifier."
+                    },
+                    {
+                      "name": "IncidentName",
+                      "type": "string",
+                      "description": "Human-readable incident name."
+                    },
+                    {
+                      "name": "Status",
+                      "type": "string",
+                      "description": "Current incident status."
+                    },
+                    {
+                      "name": "Severity",
+                      "type": "string",
+                      "description": "Incident severity."
+                    },
+                    {
+                      "name": "Validity",
+                      "type": "string",
+                      "description": "Current secret validity."
+                    },
+                    {
+                      "name": "RiskScore",
+                      "type": "long",
+                      "description": "GitGuardian incident risk score."
+                    },
+                    {
+                      "name": "LastTriggeredAt",
+                      "type": "datetime",
+                      "description": "Time the incident was last triggered."
+                    },
+                    {
+                      "name": "TriggeredAt",
+                      "type": "datetime",
+                      "description": "Time the incident was initially triggered."
+                    },
+                    {
+                      "name": "IgnoredAt",
+                      "type": "datetime",
+                      "description": "Time the incident was ignored."
+                    },
+                    {
+                      "name": "ResolvedAt",
+                      "type": "datetime",
+                      "description": "Time the incident was resolved."
+                    },
+                    {
+                      "name": "SecretId",
+                      "type": "long",
+                      "description": "GitGuardian secret identifier."
+                    },
+                    {
+                      "name": "SecretHash",
+                      "type": "string",
+                      "description": "GitGuardian hash of the detected secret."
+                    },
+                    {
+                      "name": "HasMySecretLeakedHash",
+                      "type": "string",
+                      "description": "HasMySecretLeaked hash of the detected secret."
+                    },
+                    {
+                      "name": "GitGuardianUrl",
+                      "type": "string",
+                      "description": "URL of the incident in GitGuardian."
+                    },
+                    {
+                      "name": "IsRegression",
+                      "type": "boolean",
+                      "description": "Indicates whether the incident is a regression."
+                    },
+                    {
+                      "name": "AssigneeId",
+                      "type": "long",
+                      "description": "Identifier of the assigned member."
+                    },
+                    {
+                      "name": "AssigneeEmail",
+                      "type": "string",
+                      "description": "Email address of the assigned member."
+                    },
+                    {
+                      "name": "OccurrencesCount",
+                      "type": "long",
+                      "description": "Number of secret occurrences."
+                    },
+                    {
+                      "name": "IgnoreReason",
+                      "type": "string",
+                      "description": "Reason the incident was ignored."
+                    },
+                    {
+                      "name": "IgnorerId",
+                      "type": "long",
+                      "description": "Identifier of the member who ignored the incident."
+                    },
+                    {
+                      "name": "IgnorerApiTokenId",
+                      "type": "string",
+                      "description": "API token that ignored the incident."
+                    },
+                    {
+                      "name": "ResolverId",
+                      "type": "long",
+                      "description": "Identifier of the member who resolved the incident."
+                    },
+                    {
+                      "name": "ResolverApiTokenId",
+                      "type": "string",
+                      "description": "API token that resolved the incident."
+                    },
+                    {
+                      "name": "IsSecretRevoked",
+                      "type": "boolean",
+                      "description": "Indicates whether the secret was revoked."
+                    },
+                    {
+                      "name": "ShareUrl",
+                      "type": "string",
+                      "description": "GitGuardian incident sharing URL."
+                    },
+                    {
+                      "name": "SeverityRuleId",
+                      "type": "long",
+                      "description": "Identifier of the severity rule applied to the incident."
+                    },
+                    {
+                      "name": "IsVaulted",
+                      "type": "boolean",
+                      "description": "Indicates whether the secret is stored in a vault."
+                    },
+                    {
+                      "name": "Detector",
+                      "type": "dynamic",
+                      "description": "Detector details."
+                    },
+                    {
+                      "name": "SecretPresence",
+                      "type": "dynamic",
+                      "description": "Secret presence details."
+                    },
+                    {
+                      "name": "Tags",
+                      "type": "dynamic",
+                      "description": "GitGuardian incident tags."
+                    },
+                    {
+                      "name": "CustomTags",
+                      "type": "dynamic",
+                      "description": "Workspace custom tags."
+                    },
+                    {
+                      "name": "Feedback",
+                      "type": "dynamic",
+                      "description": "Incident feedback records."
+                    },
+                    {
+                      "name": "PublicExposure",
+                      "type": "dynamic",
+                      "description": "Public exposure details."
+                    },
+                    {
+                      "name": "DestinationTickets",
+                      "type": "dynamic",
+                      "description": "External remediation tickets linked to the incident."
+                    },
+                    {
+                      "name": "Occurrences",
+                      "type": "dynamic",
+                      "description": "Secret occurrence details returned by GitGuardian."
+                    },
+                    {
+                      "name": "ConnectionName",
+                      "type": "string",
+                      "description": "Friendly name of the connector instance."
+                    },
+                    {
+                      "name": "RegionApiUrl",
+                      "type": "string",
+                      "description": "GitGuardian SaaS API region used by the connector."
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "packageKind": "Solution",
+        "packageVersion": "[variables('_solutionVersion')]",
+        "packageName": "[variables('_solutionName')]",
+        "contentProductId": "[concat(take(variables('_solutionId'), 50),'-','dc','-', uniqueString(concat(variables('_solutionId'),'-','DataConnector','-',variables('_dataConnectorContentIdConnectorDefinition1'),'-', variables('dataConnectorCCPVersion'))))]",
+        "packageId": "[variables('_solutionId')]",
+        "contentSchemaVersion": "3.0.0",
+        "version": "[variables('dataConnectorCCPVersion')]"
+      }
+    },
+    {
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',variables('_dataConnectorContentIdConnectorDefinition1'))]",
+      "apiVersion": "2022-09-01-preview",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+      "location": "[parameters('workspace-location')]",
+      "kind": "Customizable",
+      "properties": {
+        "connectorUiConfig": {
+          "id": "GitGuardianEnterpriseDataConnector",
+          "title": "GitGuardian Enterprise (via Codeless Connector Framework)",
+          "publisher": "GitGuardian",
+          "descriptionMarkdown": "The GitGuardian Enterprise data connector ingests secret incidents and workspace audit logs into Microsoft Sentinel by using the GitGuardian API. Secret incidents provide visibility into exposed secrets and their remediation lifecycle. Audit logs record administrative and user activity in the GitGuardian workspace.\n\nThis connector supports the GitGuardian SaaS US and EU regions.",
+          "graphQueriesTableName": "GitGuardianSecretIncidents_CL",
+          "graphQueries": [
+            {
+              "metricName": "GitGuardian secret incidents",
+              "legend": "Secret incidents",
+              "baseQuery": "GitGuardianSecretIncidents_CL"
+            },
+            {
+              "metricName": "GitGuardian audit logs",
+              "legend": "Audit logs",
+              "baseQuery": "GitGuardianAuditLogs_CL"
+            }
+          ],
+          "sampleQueries": [
+            {
+              "description": "Recent GitGuardian secret incidents",
+              "query": "GitGuardianSecretIncidents_CL\n| sort by TimeGenerated desc\n| take 10"
+            },
+            {
+              "description": "Open secret incidents by severity",
+              "query": "GitGuardianSecretIncidents_CL\n| where Status == \"TRIGGERED\"\n| summarize IncidentCount = count() by Severity\n| sort by IncidentCount desc"
+            },
+            {
+              "description": "Recent GitGuardian workspace audit activity",
+              "query": "GitGuardianAuditLogs_CL\n| sort by TimeGenerated desc\n| take 10"
+            },
+            {
+              "description": "GitGuardian audit activity by event",
+              "query": "GitGuardianAuditLogs_CL\n| summarize EventCount = count() by EventName, ActionType\n| sort by EventCount desc"
+            }
+          ],
+          "dataTypes": [
+            {
+              "name": "GitGuardianSecretIncidents_CL",
+              "lastDataReceivedQuery": "GitGuardianSecretIncidents_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+            },
+            {
+              "name": "GitGuardianAuditLogs_CL",
+              "lastDataReceivedQuery": "GitGuardianAuditLogs_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+            }
+          ],
+          "connectivityCriteria": [
+            {
+              "type": "HasDataConnectors"
+            },
+            {
+              "type": "IsConnectedQuery",
+              "value": [
+                "union GitGuardianSecretIncidents_CL, GitGuardianAuditLogs_CL | where TimeGenerated > ago(1h) | take 1"
+              ]
+            }
+          ],
+          "availability": {
+            "isPreview": true,
+            "status": 1
+          },
+          "permissions": {
+            "resourceProvider": [
+              {
+                "provider": "Microsoft.OperationalInsights/workspaces",
+                "permissionsDisplayText": "Read and write permissions are required.",
+                "providerDisplayName": "Workspace",
+                "scope": "Workspace",
+                "requiredPermissions": {
+                  "write": true,
+                  "read": true,
+                  "delete": true,
+                  "action": false
+                }
+              }
+            ],
+            "customs": [
+              {
+                "name": "GitGuardian Enterprise workspace",
+                "description": "An active GitGuardian Enterprise workspace in the US or EU SaaS region is required."
+              },
+              {
+                "name": "GitGuardian API token",
+                "description": "A GitGuardian service account token with the `incidents:read` and `audit_logs:read` scopes is required."
+              }
+            ]
+          },
+          "instructionSteps": [
+            {
+              "title": "Create a GitGuardian service account token",
+              "description": "1. In GitGuardian, create a service account for Microsoft Sentinel.\n2. Grant the service account the `incidents:read` and `audit_logs:read` scopes.\n3. Create and securely copy its API token.\n\nFor more information, see the [GitGuardian API authentication documentation](https://docs.gitguardian.com/api-docs/authentication)."
+            },
+            {
+              "title": "Connect GitGuardian Enterprise",
+              "description": "Select the GitGuardian SaaS region and enter the service account token.",
+              "instructions": [
+                {
+                  "type": "ContextPane",
+                  "parameters": {
+                    "label": "Add Connection",
+                    "title": "Add GitGuardian Enterprise connection",
+                    "subtitle": "Collect secret incidents and workspace audit logs",
+                    "contextPaneType": "DataConnectorsContextPane",
+                    "instructionSteps": [
+                      {
+                        "instructions": [
+                          {
+                            "type": "Textbox",
+                            "parameters": {
+                              "label": "Connection name",
+                              "placeholder": "e.g. Contoso GitGuardian",
+                              "type": "text",
+                              "name": "friendlyName",
+                              "validations": {
+                                "required": true
+                              }
+                            }
+                          },
+                          {
+                            "type": "Dropdown",
+                            "parameters": {
+                              "label": "GitGuardian SaaS region",
+                              "name": "BaseUrl",
+                              "options": [
+                                {
+                                  "key": "https://api.gitguardian.com",
+                                  "text": "United States"
+                                },
+                                {
+                                  "key": "https://api.eu1.gitguardian.com",
+                                  "text": "Europe"
+                                }
+                              ],
+                              "isMultiSelect": false,
+                              "required": true
+                            }
+                          },
+                          {
+                            "type": "Textbox",
+                            "parameters": {
+                              "label": "API token",
+                              "placeholder": "Enter the GitGuardian service account token",
+                              "type": "password",
+                              "name": "ApiToken",
+                              "validations": {
+                                "required": true
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "DataConnectorsGrid",
+                  "parameters": {
+                    "mapping": [
+                      {
+                        "columnName": "Connection",
+                        "columnValue": "properties.addOnAttributes.friendlyName"
+                      },
+                      {
+                        "columnName": "Data stream",
+                        "columnValue": "properties.dataType"
+                      },
+                      {
+                        "columnName": "API URL",
+                        "columnValue": "properties.request.apiEndpoint"
+                      }
+                    ],
+                    "menuItems": [
+                      "DeleteConnector"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',concat('DataConnector-', variables('_dataConnectorContentIdConnectorDefinition1')))]",
+      "apiVersion": "2022-01-01-preview",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/metadata",
+      "properties": {
+        "parentId": "[extensionResourceId(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), 'Microsoft.SecurityInsights/dataConnectorDefinitions', variables('_dataConnectorContentIdConnectorDefinition1'))]",
+        "contentId": "[variables('_dataConnectorContentIdConnectorDefinition1')]",
+        "kind": "DataConnector",
+        "version": "[variables('dataConnectorCCPVersion')]",
+        "source": {
+          "sourceId": "[variables('_solutionId')]",
+          "name": "[variables('_solutionName')]",
+          "kind": "Solution"
+        },
+        "author": {
+          "name": "GitGuardian",
+          "email": "[variables('_email')]"
+        },
+        "support": {
+          "name": "GitGuardian",
+          "email": "support@gitguardian.com",
+          "tier": "Partner",
+          "link": "https://www.gitguardian.com/support"
+        },
+        "dependencies": {
+          "criteria": [
+            {
+              "version": "[variables('dataConnectorCCPVersion')]",
+              "contentId": "[variables('_dataConnectorContentIdConnections1')]",
+              "kind": "ResourcesDataConnector"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/contentTemplates",
+      "apiVersion": "2023-04-01-preview",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', variables('dataConnectorTemplateNameConnections1'), variables('dataConnectorCCPVersion'))]",
+      "location": "[parameters('workspace-location')]",
+      "dependsOn": [
+        "[extensionResourceId(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), 'Microsoft.SecurityInsights/contentPackages', variables('_solutionId'))]"
+      ],
+      "properties": {
+        "contentId": "[variables('_dataConnectorContentIdConnections1')]",
+        "displayName": "GitGuardian Enterprise (via Codeless Connector Framework)",
+        "contentKind": "ResourcesDataConnector",
+        "mainTemplate": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "[variables('dataConnectorCCPVersion')]",
+          "parameters": {
+            "guidValue": {
+              "defaultValue": "[[newGuid()]",
+              "type": "securestring"
+            },
+            "innerWorkspace": {
+              "defaultValue": "[parameters('workspace')]",
+              "type": "securestring"
+            },
+            "connectorDefinitionName": {
+              "defaultValue": "GitGuardian Enterprise (via Codeless Connector Framework)",
+              "type": "securestring",
+              "minLength": 1
+            },
+            "workspace": {
+              "defaultValue": "[parameters('workspace')]",
+              "type": "securestring"
+            },
+            "dcrConfig": {
+              "defaultValue": {
+                "dataCollectionEndpoint": "data collection Endpoint",
+                "dataCollectionRuleImmutableId": "data collection rule immutableId"
+              },
+              "type": "object"
+            },
+            "friendlyName": {
+              "defaultValue": "friendlyName",
+              "type": "securestring",
+              "minLength": 1
+            },
+            "BaseUrl": {
+              "defaultValue": "BaseUrl",
+              "type": "array"
+            },
+            "ApiToken": {
+              "defaultValue": "ApiToken",
+              "type": "securestring",
+              "minLength": 1
+            }
+          },
+          "variables": {
+            "_dataConnectorContentIdConnections1": "[variables('_dataConnectorContentIdConnections1')]"
+          },
+          "resources": [
+            {
+              "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',concat('DataConnector-', variables('_dataConnectorContentIdConnections1')))]",
+              "apiVersion": "2022-01-01-preview",
+              "type": "Microsoft.OperationalInsights/workspaces/providers/metadata",
+              "properties": {
+                "parentId": "[extensionResourceId(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspace')), 'Microsoft.SecurityInsights/dataConnectors', variables('_dataConnectorContentIdConnections1'))]",
+                "contentId": "[variables('_dataConnectorContentIdConnections1')]",
+                "kind": "ResourcesDataConnector",
+                "version": "[variables('dataConnectorCCPVersion')]",
+                "source": {
+                  "sourceId": "[variables('_solutionId')]",
+                  "name": "[variables('_solutionName')]",
+                  "kind": "Solution"
+                },
+                "author": {
+                  "name": "GitGuardian",
+                  "email": "[variables('_email')]"
+                },
+                "support": {
+                  "name": "GitGuardian",
+                  "email": "support@gitguardian.com",
+                  "tier": "Partner",
+                  "link": "https://www.gitguardian.com/support"
+                }
+              }
+            },
+            {
+              "name": "[[concat(parameters('innerWorkspace'),'/Microsoft.SecurityInsights/', 'GitGuardianSecretIncidentsPoller', parameters('guidValue'))]",
+              "apiVersion": "2023-02-01-preview",
+              "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+              "location": "[parameters('workspace-location')]",
+              "kind": "RestApiPoller",
+              "properties": {
+                "connectorDefinitionName": "GitGuardianEnterpriseDataConnector",
+                "dataType": "GitGuardianSecretIncidents_CL",
+                "dcrConfig": {
+                  "streamName": "Custom-GitGuardianSecretIncidents_CL",
+                  "dataCollectionEndpoint": "[[parameters('dcrConfig').dataCollectionEndpoint]",
+                  "dataCollectionRuleImmutableId": "[[parameters('dcrConfig').dataCollectionRuleImmutableId]"
+                },
+                "auth": {
+                  "type": "APIKey",
+                  "ApiKey": "[[parameters('ApiToken')]",
+                  "ApiKeyName": "Authorization",
+                  "ApiKeyIdentifier": "Token"
+                },
+                "request": {
+                  "apiEndpoint": "[[concat(parameters('BaseUrl'),'/v1/incidents/secrets')]",
+                  "httpMethod": "GET",
+                  "rateLimitQPS": 2,
+                  "queryWindowInMin": 5,
+                  "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+                  "retryCount": 3,
+                  "timeoutInSeconds": 60,
+                  "headers": {
+                    "Accept": "application/json",
+                    "User-Agent": "Microsoft-Sentinel-GitGuardian-Connector/1.0"
+                  },
+                  "queryParameters": {
+                    "date_after": "{_QueryWindowStartTime}",
+                    "date_before": "{_QueryWindowEndTime}",
+                    "ordering": "date"
+                  }
+                },
+                "response": {
+                  "eventsJsonPaths": [
+                    "$[*]"
+                  ],
+                  "format": "json"
+                },
+                "paging": {
+                  "pagingType": "LinkHeader",
+                  "pageSize": 100,
+                  "pageSizeParameterName": "per_page"
+                },
+                "addOnAttributes": {
+                  "friendlyName": "[[parameters('friendlyName')]",
+                  "regionApiUrl": "[[parameters('BaseUrl')]"
+                }
+              }
+            },
+            {
+              "name": "[[concat(parameters('innerWorkspace'),'/Microsoft.SecurityInsights/', 'GitGuardianAuditLogsPoller', parameters('guidValue'))]",
+              "apiVersion": "2023-02-01-preview",
+              "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+              "location": "[parameters('workspace-location')]",
+              "kind": "RestApiPoller",
+              "properties": {
+                "connectorDefinitionName": "GitGuardianEnterpriseDataConnector",
+                "dataType": "GitGuardianAuditLogs_CL",
+                "dcrConfig": {
+                  "streamName": "Custom-GitGuardianAuditLogs_CL",
+                  "dataCollectionEndpoint": "[[parameters('dcrConfig').dataCollectionEndpoint]",
+                  "dataCollectionRuleImmutableId": "[[parameters('dcrConfig').dataCollectionRuleImmutableId]"
+                },
+                "auth": {
+                  "type": "APIKey",
+                  "ApiKey": "[[parameters('ApiToken')]",
+                  "ApiKeyName": "Authorization",
+                  "ApiKeyIdentifier": "Token"
+                },
+                "request": {
+                  "apiEndpoint": "[[concat(parameters('BaseUrl'),'/v1/audit_logs')]",
+                  "httpMethod": "GET",
+                  "rateLimitQPS": 2,
+                  "queryWindowInMin": 5,
+                  "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+                  "retryCount": 3,
+                  "timeoutInSeconds": 60,
+                  "headers": {
+                    "Accept": "application/json",
+                    "User-Agent": "Microsoft-Sentinel-GitGuardian-Connector/1.0"
+                  },
+                  "queryParameters": {
+                    "date_after": "{_QueryWindowStartTime}",
+                    "date_before": "{_QueryWindowEndTime}"
+                  }
+                },
+                "response": {
+                  "eventsJsonPaths": [
+                    "$[*]"
+                  ],
+                  "format": "json"
+                },
+                "paging": {
+                  "pagingType": "LinkHeader",
+                  "pageSize": 100,
+                  "pageSizeParameterName": "per_page"
+                },
+                "addOnAttributes": {
+                  "friendlyName": "[[parameters('friendlyName')]",
+                  "regionApiUrl": "[[parameters('BaseUrl')]"
+                }
+              }
+            }
+          ]
+        },
+        "packageKind": "Solution",
+        "packageVersion": "[variables('_solutionVersion')]",
+        "packageName": "[variables('_solutionName')]",
+        "contentProductId": "[concat(take(variables('_solutionId'), 50),'-','rdc','-', uniqueString(concat(variables('_solutionId'),'-','ResourcesDataConnector','-',variables('_dataConnectorContentIdConnections1'),'-', variables('dataConnectorCCPVersion'))))]",
+        "packageId": "[variables('_solutionId')]",
+        "contentSchemaVersion": "3.0.0",
+        "version": "[variables('dataConnectorCCPVersion')]"
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/contentPackages",
+      "apiVersion": "2023-04-01-preview",
+      "location": "[parameters('workspace-location')]",
+      "properties": {
+        "version": "4.0.0",
+        "kind": "Solution",
+        "contentSchemaVersion": "3.0.0",
+        "displayName": "GitGuardian",
+        "publisherDisplayName": "GitGuardian",
+        "descriptionHtml": "<p><strong>Note:</strong> Please refer to the following before installing the solution:</p>\n<p>• Review the solution <a href=\"https://github.com/Azure/Azure-Sentinel/tree/master/Solutions/GitGuardian/ReleaseNotes.md\">Release Notes</a></p>\n<p>• There may be <a href=\"https://aka.ms/sentinelsolutionsknownissues\">known issues</a> pertaining to this Solution, please refer to them before installing.</p>\n<p>The <a href=\"https://www.gitguardian.com/\">GitGuardian</a> solution for Microsoft Sentinel enables ingestion of <a href=\"https://docs.gitguardian.com/api-docs\">secret incidents</a> and <a href=\"https://docs.gitguardian.com/platform/enterprise-administration/audit-log\">workspace audit logs</a> from GitGuardian Enterprise.</p>\n<p><strong>Underlying Microsoft Technologies used:</strong></p>\n<p>This solution takes a dependency on the following technology, which might result in additional ingestion or operational costs:</p>\n<p>• <a href=\"https://aka.ms/Sentinel-CCP_Platform\">Microsoft Sentinel Codeless Connector Framework</a></p>\n<p><strong>Data Connectors:</strong> 1</p>\n<p><a href=\"https://aka.ms/azuresentinel\">Learn more about Microsoft Sentinel</a> | <a href=\"https://aka.ms/azuresentinelsolutionsdoc\">Learn more about Solutions</a></p>\n",
+        "contentKind": "Solution",
+        "contentProductId": "[variables('_solutioncontentProductId')]",
+        "id": "[variables('_solutioncontentProductId')]",
+        "icon": "<img src=\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Logos/GitGuardian.svg\" width=\"75px\" height=\"75px\">",
+        "contentId": "[variables('_solutionId')]",
+        "parentId": "[variables('_solutionId')]",
+        "source": {
+          "kind": "Solution",
+          "name": "GitGuardian",
+          "sourceId": "[variables('_solutionId')]"
+        },
+        "author": {
+          "name": "GitGuardian",
+          "email": "[variables('_email')]"
+        },
+        "support": {
+          "name": "GitGuardian",
+          "email": "support@gitguardian.com",
+          "tier": "Partner",
+          "link": "https://www.gitguardian.com/support"
+        },
+        "dependencies": {
+          "operator": "AND",
+          "criteria": [
+            {
+              "kind": "DataConnector",
+              "contentId": "[variables('_dataConnectorContentIdConnections1')]",
+              "version": "[variables('dataConnectorCCPVersion')]"
+            }
+          ]
+        },
+        "firstPublishDate": "2026-09-22",
+        "providers": [
+          "GitGuardian"
+        ],
+        "categories": {
+          "domains": [
+            "Security - Others"
+          ]
+        }
+      },
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', variables('_solutionId'))]"
+    }
+  ],
+  "outputs": {}
+}

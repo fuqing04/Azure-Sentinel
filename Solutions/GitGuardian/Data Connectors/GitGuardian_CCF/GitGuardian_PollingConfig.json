@@ -1,0 +1,111 @@
+[
+  {
+    "name": "GitGuardianSecretIncidentsPoller",
+    "apiVersion": "2024-09-01",
+    "type": "Microsoft.SecurityInsights/dataConnectors",
+    "location": "{{location}}",
+    "kind": "RestApiPoller",
+    "properties": {
+      "connectorDefinitionName": "GitGuardianEnterpriseDataConnector",
+      "dataType": "GitGuardianSecretIncidents_CL",
+      "dcrConfig": {
+        "streamName": "Custom-GitGuardianSecretIncidents_CL",
+        "dataCollectionEndpoint": "{{dataCollectionEndpoint}}",
+        "dataCollectionRuleImmutableId": "{{dataCollectionRuleImmutableId}}"
+      },
+      "auth": {
+        "type": "APIKey",
+        "ApiKey": "{{ApiToken}}",
+        "ApiKeyName": "Authorization",
+        "ApiKeyIdentifier": "Token"
+      },
+      "request": {
+        "apiEndpoint": "{{BaseUrl}}/v1/incidents/secrets",
+        "httpMethod": "GET",
+        "rateLimitQPS": 2,
+        "queryWindowInMin": 5,
+        "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+        "retryCount": 3,
+        "timeoutInSeconds": 60,
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "Microsoft-Sentinel-GitGuardian-Connector/1.0"
+        },
+        "queryParameters": {
+          "date_after": "{_QueryWindowStartTime}",
+          "date_before": "{_QueryWindowEndTime}",
+          "ordering": "date"
+        }
+      },
+      "response": {
+        "eventsJsonPaths": [
+          "$[*]"
+        ],
+        "format": "json"
+      },
+      "paging": {
+        "pagingType": "LinkHeader",
+        "pageSize": 100,
+        "pageSizeParameterName": "per_page"
+      },
+      "addOnAttributes": {
+        "friendlyName": "{{friendlyName}}",
+        "regionApiUrl": "{{BaseUrl}}"
+      }
+    }
+  },
+  {
+    "name": "GitGuardianAuditLogsPoller",
+    "apiVersion": "2024-09-01",
+    "type": "Microsoft.SecurityInsights/dataConnectors",
+    "location": "{{location}}",
+    "kind": "RestApiPoller",
+    "properties": {
+      "connectorDefinitionName": "GitGuardianEnterpriseDataConnector",
+      "dataType": "GitGuardianAuditLogs_CL",
+      "dcrConfig": {
+        "streamName": "Custom-GitGuardianAuditLogs_CL",
+        "dataCollectionEndpoint": "{{dataCollectionEndpoint}}",
+        "dataCollectionRuleImmutableId": "{{dataCollectionRuleImmutableId}}"
+      },
+      "auth": {
+        "type": "APIKey",
+        "ApiKey": "{{ApiToken}}",
+        "ApiKeyName": "Authorization",
+        "ApiKeyIdentifier": "Token"
+      },
+      "request": {
+        "apiEndpoint": "{{BaseUrl}}/v1/audit_logs",
+        "httpMethod": "GET",
+        "rateLimitQPS": 2,
+        "queryWindowInMin": 5,
+        "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+        "retryCount": 3,
+        "timeoutInSeconds": 60,
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "Microsoft-Sentinel-GitGuardian-Connector/1.0"
+        },
+        "queryParameters": {
+          "date_after": "{_QueryWindowStartTime}",
+          "date_before": "{_QueryWindowEndTime}"
+        }
+      },
+      "response": {
+        "eventsJsonPaths": [
+          "$[*]"
+        ],
+        "format": "json"
+      },
+      "paging": {
+        "pagingType": "LinkHeader",
+        "pageSize": 100,
+        "pageSizeParameterName": "per_page"
+      },
+      "addOnAttributes": {
+        "friendlyName": "{{friendlyName}}",
+        "regionApiUrl": "{{BaseUrl}}"
+      }
+    }
+  }
+]

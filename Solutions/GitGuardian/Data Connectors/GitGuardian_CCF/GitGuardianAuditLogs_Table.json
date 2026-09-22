@@ -1,0 +1,28 @@
+{
+  "name": "GitGuardianAuditLogs_CL",
+  "apiVersion": "2025-07-01",
+  "type": "Microsoft.OperationalInsights/workspaces/tables",
+  "location": "{{location}}",
+  "properties": {
+    "schema": {
+      "name": "GitGuardianAuditLogs_CL",
+      "description": "GitGuardian workspace administrative and user audit activity.",
+      "columns": [
+        { "name": "TimeGenerated", "type": "datetime", "description": "Time the audited event occurred." },
+        { "name": "AuditLogId", "type": "long", "description": "Unique GitGuardian audit log identifier." },
+        { "name": "EventTime", "type": "datetime", "description": "Time the audited event occurred." },
+        { "name": "EventName", "type": "string", "description": "Name of the audited event." },
+        { "name": "ActionType", "type": "string", "description": "Type of action performed." },
+        { "name": "MemberId", "type": "long", "description": "Identifier of the member who performed the action." },
+        { "name": "MemberName", "type": "string", "description": "Name of the member who performed the action." },
+        { "name": "MemberEmail", "type": "string", "description": "Email of the member who performed the action." },
+        { "name": "ApiTokenId", "type": "string", "description": "Identifier of the API token used for the action." },
+        { "name": "IpAddress", "type": "string", "description": "Source IP address of the audited action." },
+        { "name": "TargetIds", "type": "dynamic", "description": "Identifiers of resources targeted by the action." },
+        { "name": "EventData", "type": "dynamic", "description": "Additional data associated with the audited event." },
+        { "name": "ConnectionName", "type": "string", "description": "Friendly name of the connector instance." },
+        { "name": "RegionApiUrl", "type": "string", "description": "GitGuardian SaaS API region used by the connector." }
+      ]
+    }
+  }
+}

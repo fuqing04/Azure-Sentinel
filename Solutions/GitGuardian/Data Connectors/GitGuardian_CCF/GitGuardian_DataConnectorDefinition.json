@@ -1,0 +1,189 @@
+{
+  "name": "GitGuardianEnterpriseDataConnector",
+  "apiVersion": "2025-07-01-preview",
+  "type": "Microsoft.SecurityInsights/dataConnectorDefinitions",
+  "location": "{{location}}",
+  "kind": "Customizable",
+  "properties": {
+    "connectorUiConfig": {
+      "id": "GitGuardianEnterpriseDataConnector",
+      "title": "GitGuardian Enterprise (via Codeless Connector Framework)",
+      "publisher": "GitGuardian",
+      "descriptionMarkdown": "The GitGuardian Enterprise data connector ingests secret incidents and workspace audit logs into Microsoft Sentinel by using the GitGuardian API. Secret incidents provide visibility into exposed secrets and their remediation lifecycle. Audit logs record administrative and user activity in the GitGuardian workspace.\n\nThis connector supports the GitGuardian SaaS US and EU regions.",
+      "graphQueriesTableName": "GitGuardianSecretIncidents_CL",
+      "graphQueries": [
+        {
+          "metricName": "GitGuardian secret incidents",
+          "legend": "Secret incidents",
+          "baseQuery": "GitGuardianSecretIncidents_CL"
+        },
+        {
+          "metricName": "GitGuardian audit logs",
+          "legend": "Audit logs",
+          "baseQuery": "GitGuardianAuditLogs_CL"
+        }
+      ],
+      "sampleQueries": [
+        {
+          "description": "Recent GitGuardian secret incidents",
+          "query": "GitGuardianSecretIncidents_CL\n| sort by TimeGenerated desc\n| take 10"
+        },
+        {
+          "description": "Open secret incidents by severity",
+          "query": "GitGuardianSecretIncidents_CL\n| where Status == \"TRIGGERED\"\n| summarize IncidentCount = count() by Severity\n| sort by IncidentCount desc"
+        },
+        {
+          "description": "Recent GitGuardian workspace audit activity",
+          "query": "GitGuardianAuditLogs_CL\n| sort by TimeGenerated desc\n| take 10"
+        },
+        {
+          "description": "GitGuardian audit activity by event",
+          "query": "GitGuardianAuditLogs_CL\n| summarize EventCount = count() by EventName, ActionType\n| sort by EventCount desc"
+        }
+      ],
+      "dataTypes": [
+        {
+          "name": "GitGuardianSecretIncidents_CL",
+          "lastDataReceivedQuery": "GitGuardianSecretIncidents_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+        },
+        {
+          "name": "GitGuardianAuditLogs_CL",
+          "lastDataReceivedQuery": "GitGuardianAuditLogs_CL\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+        }
+      ],
+      "connectivityCriteria": [
+        {
+          "type": "HasDataConnectors"
+        },
+        {
+          "type": "IsConnectedQuery",
+          "value": [
+            "union GitGuardianSecretIncidents_CL, GitGuardianAuditLogs_CL | where TimeGenerated > ago(1h) | take 1"
+          ]
+        }
+      ],
+      "availability": {
+        "isPreview": true,
+        "status": 1
+      },
+      "permissions": {
+        "resourceProvider": [
+          {
+            "provider": "Microsoft.OperationalInsights/workspaces",
+            "permissionsDisplayText": "Read and write permissions are required.",
+            "providerDisplayName": "Workspace",
+            "scope": "Workspace",
+            "requiredPermissions": {
+              "write": true,
+              "read": true,
+              "delete": true,
+              "action": false
+            }
+          }
+        ],
+        "customs": [
+          {
+            "name": "GitGuardian Enterprise workspace",
+            "description": "An active GitGuardian Enterprise workspace in the US or EU SaaS region is required."
+          },
+          {
+            "name": "GitGuardian API token",
+            "description": "A GitGuardian service account token with the `incidents:read` and `audit_logs:read` scopes is required."
+          }
+        ]
+      },
+      "instructionSteps": [
+        {
+          "title": "Create a GitGuardian service account token",
+          "description": "1. In GitGuardian, create a service account for Microsoft Sentinel.\n2. Grant the service account the `incidents:read` and `audit_logs:read` scopes.\n3. Create and securely copy its API token.\n\nFor more information, see the [GitGuardian API authentication documentation](https://docs.gitguardian.com/api-docs/authentication)."
+        },
+        {
+          "title": "Connect GitGuardian Enterprise",
+          "description": "Select the GitGuardian SaaS region and enter the service account token.",
+          "instructions": [
+            {
+              "type": "ContextPane",
+              "parameters": {
+                "label": "Add Connection",
+                "title": "Add GitGuardian Enterprise connection",
+                "subtitle": "Collect secret incidents and workspace audit logs",
+                "contextPaneType": "DataConnectorsContextPane",
+                "instructionSteps": [
+                  {
+                    "instructions": [
+                      {
+                        "type": "Textbox",
+                        "parameters": {
+                          "label": "Connection name",
+                          "placeholder": "e.g. Contoso GitGuardian",
+                          "type": "text",
+                          "name": "friendlyName",
+                          "validations": {
+                            "required": true
+                          }
+                        }
+                      },
+                      {
+                        "type": "Dropdown",
+                        "parameters": {
+                          "label": "GitGuardian SaaS region",
+                          "name": "BaseUrl",
+                          "options": [
+                            {
+                              "key": "https://api.gitguardian.com",
+                              "text": "United States"
+                            },
+                            {
+                              "key": "https://api.eu1.gitguardian.com",
+                              "text": "Europe"
+                            }
+                          ],
+                          "isMultiSelect": false,
+                          "required": true
+                        }
+                      },
+                      {
+                        "type": "Textbox",
+                        "parameters": {
+                          "label": "API token",
+                          "placeholder": "Enter the GitGuardian service account token",
+                          "type": "password",
+                          "name": "ApiToken",
+                          "validations": {
+                            "required": true
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "DataConnectorsGrid",
+              "parameters": {
+                "mapping": [
+                  {
+                    "columnName": "Connection",
+                    "columnValue": "properties.addOnAttributes.friendlyName"
+                  },
+                  {
+                    "columnName": "Data stream",
+                    "columnValue": "properties.dataType"
+                  },
+                  {
+                    "columnName": "API URL",
+                    "columnValue": "properties.request.apiEndpoint"
+                  }
+                ],
+                "menuItems": [
+                  "DeleteConnector"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
